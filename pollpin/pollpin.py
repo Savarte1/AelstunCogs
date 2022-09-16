@@ -1,12 +1,15 @@
 from redbot.core import commands, Config
 from redbot.core.bot import Red
+from redbot.core.utils import mod
 import discord
-from typing import Union, Dict
+import secrets
+
 
 class PollPin(commands.Cog):
     """A cog to generate pins for voting ballots using forms"""
 
     def __init__(self, bot: Red):
+        super().__init__()
         self.bot = bot
         self.config = Config.get_conf(self, identifier=46_930_395_012, force_registration=True)
         default_guild = {
@@ -17,52 +20,78 @@ class PollPin(commands.Cog):
     # Helper functions
 
     async def _pollpin_makepoll(self, guild: discord.Guild, role: discord.Role, author: discord.User, poll: str):
-        await self.config.guild(guild).set_raw("polls", poll, value={"role": role.id, "owner": author.id ,"pins": {}}) 
-        
+        await self.config.guild(guild).set_raw("polls", poll, value={"role": role.id, "owner": author.id, "pins": {}})
+
     async def _pollpin_exists(self, guild: discord.Guild, poll) -> bool:
         polls = await self.config.guild(guild).polls()
-        if (poll in polls):
+        if poll in polls:
             return True
         else:
             return False
-    
+
     async def _pollpin_delpoll(self, guild: discord.Guild, poll):
         await self.config.guild(guild).clear_raw("polls", poll)
 
-    def _pollpin_embed(self, **kwargs):
+    async def _pollpin_getpin(self, guild: discord.Guild, user: discord.Member, poll: str):
+        data = await self.config.guild(guild).get_raw("polls", poll, "pins")
+        if str(user.id) in data:
+            return data[str(user.id)]
+        else:
+            pin = secrets.randbelow(1_000_000)
+            while self._pollpin_checkdupl(data, pin):
+                pin = secrets.randbelow(1_000_000)
+            await self.config.guild(guild).set_raw("polls", poll, "pins", user.id, value=pin)
+            return pin
+
+    @staticmethod
+    def _pollpin_checkdupl(data, checkval):
+        for value in data.values():
+            if checkval == value:
+                return True
+        return False
+
+    @staticmethod
+    def _pollpin_embed(**kwargs):
         embedargs = kwargs
         embedargs["title"] = "PollPins"
         embedargs["colour"] = discord.Colour.dark_purple()
         embed = discord.Embed(**embedargs)
         return embed
-    
+
     # Commands
 
     @commands.command()
     @commands.guild_only()
-    async def getpin(self, ctx: commands.Context, pollname: str):
+    async def getpin(self, ctx: commands.Context, poll: str):
         """Obtain a poll pin"""
-        
-        await ctx.author.send(f"Your PIN for the {pollname} poll is")
-    
+        if await self._pollpin_exists(ctx.guild, poll):
+            data = await self.config.guild(ctx.guild).get_raw("polls", poll)
+            role = discord.utils.get(ctx.guild.roles, id=data["role"])
+            if role in ctx.author.roles:
+                pin = await self._pollpin_getpin(ctx.guild, ctx.author, poll)
+                await ctx.send("Your PIN has been sent via DM")
+                await ctx.author.send(f"Your PIN for the {poll} poll in {ctx.guild} is {pin}")
+            else:
+                await ctx.send("You do not have the proper role for this poll")
+        else:
+            await ctx.send(f"{poll} does not exist")
+
     @commands.group()
-    @commands.mod()
     @commands.guild_only()
     async def managepoll(self, ctx: commands.Context):
         """Manage polls"""
         pass
 
+    @commands.admin()
     @managepoll.command(name="new")
     async def managepoll_new(self, ctx: commands.Context, poll: str, role: discord.Role):
         """Make new poll"""
-        msg = ""
         if not await self._pollpin_exists(ctx.guild, poll):
             await self._pollpin_makepoll(ctx.guild, role, ctx.author, poll)
-            msg = f"Made new poll {poll} for role {role.name}"
+            await ctx.send(f"Made new poll {poll} for role {role.name}")
         else:
-            msg = f"{poll} already exists"
-        await ctx.send(msg)
-    
+            await ctx.send(f"{poll} already exists")
+
     @managepoll.command(name="list")
     async def managepoll_list(self, ctx: commands.Context):
         """Get list of polls"""
@@ -83,26 +112,35 @@ class PollPin(commands.Cog):
             embed.add_field(name="Notice", value="There are no polls in this server")
         await ctx.send(embed=embed)
 
-    @managepoll.command(name="getpins")
-    async def managepoll_getpins(self, ctx: commands.Context, poll: str):
-        """Get list of pins from poll"""
-        msg = ""
+    @managepoll.command(name="info")
+    async def managepoll_info(self, ctx: commands.Context, poll: str):
+        """Get info about a specific poll"""
         if await self._pollpin_exists(ctx.guild, poll):
-            msg = f"**List of Pins in {poll}:**"
+            pinlist = ""
             data = await self.config.guild(ctx.guild).get_raw("polls", poll)
+            role = discord.utils.get(ctx.guild.roles, id=data["role"])
+            author = self.bot.get_user(data["owner"])
             for pinnumber in data["pins"].values():
-                msg += f"\n {pinnumber}"
+                pinlist += f"{pinnumber}\n"
+            embed = self._pollpin_embed(description=f"Information on {poll} in {ctx.guild}")
+            embed.add_field(name="Role", value=str(role), inline=True)
+            embed.add_field(name="Owner", value=str(author), inline=True)
+            if await mod.is_admin_or_superior(self.bot, ctx.author):
+                if pinlist:
+                    embed.add_field(name="Pins", value=pinlist, inline=False)
+                else:
+                    embed.add_field(name="Pins", value="*No pins found*", inline=False)
+            embed.add_field(name="Dump", value=str(data))
+            await ctx.send(embed=embed)
         else:
-            msg = f"{poll} does not exist"
-        await ctx.author.send(msg)
+            await ctx.send(f"{poll} does not exist")
 
+    @commands.admin()
     @managepoll.command(name="remove")
     async def managepoll_remove(self, ctx: commands.Context, poll: str):
         """Delete polls"""
-        msg = ""
         if await self._pollpin_exists(ctx.guild, poll):
             await self._pollpin_delpoll(ctx.guild, poll)
-            msg = f"{poll} has been deleted"
+            await ctx.send(f"{poll} has been deleted")
         else:
-            msg = f"{poll} does not exist"
-        await ctx.send(msg)
+            await ctx.send(f"{poll} does not exist")
