@@ -124,7 +124,6 @@ class PollPin(commands.Cog):
             embed.add_field(name="Pins",
                             value=f"Use {ctx.clean_prefix}managepoll pins [poll] to get pins",
                             inline=False)
-            embed.add_field(name="Dump", value=str(data))
             await ctx.send(embed=embed)
         else:
             await ctx.send(f"{poll} does not exist")
