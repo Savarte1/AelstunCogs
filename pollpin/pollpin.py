@@ -1,6 +1,5 @@
 from redbot.core import commands, Config
 from redbot.core.bot import Red
-from redbot.core.utils import mod
 import discord
 import secrets
 
@@ -116,22 +115,37 @@ class PollPin(commands.Cog):
     async def managepoll_info(self, ctx: commands.Context, poll: str):
         """Get info about a specific poll"""
         if await self._pollpin_exists(ctx.guild, poll):
-            pinlist = ""
             data = await self.config.guild(ctx.guild).get_raw("polls", poll)
             role = discord.utils.get(ctx.guild.roles, id=data["role"])
             author = self.bot.get_user(data["owner"])
-            for pinnumber in data["pins"].values():
-                pinlist += f"{pinnumber}\n"
             embed = self._pollpin_embed(description=f"Information on {poll} in {ctx.guild}")
             embed.add_field(name="Role", value=str(role), inline=True)
             embed.add_field(name="Owner", value=str(author), inline=True)
-            if await mod.is_admin_or_superior(self.bot, ctx.author):
-                if pinlist:
-                    embed.add_field(name="Pins", value=pinlist, inline=False)
-                else:
-                    embed.add_field(name="Pins", value="*No pins found*", inline=False)
+            embed.add_field(name="Pins",
+                            value=f"Use {ctx.clean_prefix}managepoll pins [poll] to get pins",
+                            inline=False)
             embed.add_field(name="Dump", value=str(data))
             await ctx.send(embed=embed)
+        else:
+            await ctx.send(f"{poll} does not exist")
+
+    @managepoll.command(name="pins")
+    async def managepoll_pins(self, ctx: commands.Context, poll: str):
+        """Get pins from poll"""
+        if await self._pollpin_exists(ctx.guild, poll):
+            data = await self.config.guild(ctx.guild).get_raw("polls", poll)
+            if ctx.author.id == data["owner"]:
+                pinlist = ""
+                for pin in data["pins"].values():
+                    pinlist += f"{pin}\n"
+                if not pinlist:
+                    pinlist = f"No pins in {poll} at {ctx.guild}"
+                embed = self._pollpin_embed(description=f"Pins in {poll} at {ctx.guild}")
+                embed.add_field(name="Pins", value=pinlist, inline=False)
+                await ctx.send(f"The PINs for {poll} have been sent via DM")
+                await ctx.author.send(embed=embed)
+            else:
+                await ctx.send(f"You may not view the pins for {poll} as you are not the poll owner")
         else:
             await ctx.send(f"{poll} does not exist")
 
