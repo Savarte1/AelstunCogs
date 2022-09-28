@@ -36,18 +36,18 @@ class PollPin(commands.Cog):
         if str(user.id) in data:
             return data[str(user.id)]
         else:
-            pin = secrets.randbelow(1_000_000)
+            pin = secrets.randbelow(1_000_000_000)
             while self._pollpin_checkdupl(data, pin):
-                pin = secrets.randbelow(1_000_000)
+                pin = secrets.randbelow(1_000_000_000)
             await self.config.guild(guild).set_raw("polls", poll, "pins", user.id, value=pin)
             return pin
 
     @staticmethod
     def _pollpin_checkdupl(data, checkval):
-        for value in data.values():
-            if checkval == value:
-                return True
-        return False
+        if checkval in data.values():
+            return True
+        else:
+            return False
 
     @staticmethod
     def _pollpin_embed(**kwargs):
