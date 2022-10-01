@@ -10,16 +10,20 @@ class PollPin(commands.Cog):
     def __init__(self, bot: Red):
         super().__init__()
         self.bot = bot
-        self.config = Config.get_conf(self, identifier=46_930_395_012, force_registration=True)
-        default_guild = {
-            "polls": {}
-        }
+        self.config = Config.get_conf(
+            self, identifier=46_930_395_012, force_registration=True
+        )
+        default_guild = {"polls": {}}
         self.config.register_guild(**default_guild)
 
     # Helper functions
 
-    async def _pollpin_makepoll(self, guild: discord.Guild, role: discord.Role, author: discord.User, poll: str):
-        await self.config.guild(guild).set_raw("polls", poll, value={"role": role.id, "owner": author.id, "pins": {}})
+    async def _pollpin_makepoll(
+        self, guild: discord.Guild, role: discord.Role, author: discord.User, poll: str
+    ):
+        await self.config.guild(guild).set_raw(
+            "polls", poll, value={"role": role.id, "owner": author.id, "pins": {}}
+        )
 
     async def _pollpin_exists(self, guild: discord.Guild, poll) -> bool:
         polls = await self.config.guild(guild).polls()
@@ -31,7 +35,9 @@ class PollPin(commands.Cog):
     async def _pollpin_delpoll(self, guild: discord.Guild, poll):
         await self.config.guild(guild).clear_raw("polls", poll)
 
-    async def _pollpin_getpin(self, guild: discord.Guild, user: discord.Member, poll: str):
+    async def _pollpin_getpin(
+        self, guild: discord.Guild, user: discord.Member, poll: str
+    ):
         data = await self.config.guild(guild).get_raw("polls", poll, "pins")
         if str(user.id) in data:
             return data[str(user.id)]
@@ -39,7 +45,9 @@ class PollPin(commands.Cog):
             pin = secrets.randbelow(1_000_000_000)
             while self._pollpin_checkdupl(data, pin):
                 pin = secrets.randbelow(1_000_000_000)
-            await self.config.guild(guild).set_raw("polls", poll, "pins", user.id, value=pin)
+            await self.config.guild(guild).set_raw(
+                "polls", poll, "pins", user.id, value=pin
+            )
             return pin
 
     @staticmethod
@@ -69,7 +77,9 @@ class PollPin(commands.Cog):
             if role in ctx.author.roles:
                 pin = await self._pollpin_getpin(ctx.guild, ctx.author, poll)
                 await ctx.send("Your PIN has been sent via DM")
-                await ctx.author.send(f"Your PIN for the {poll} poll in {ctx.guild} is {pin}")
+                await ctx.author.send(
+                    f"Your PIN for the {poll} poll in {ctx.guild} is {pin}"
+                )
             else:
                 await ctx.send("You do not have the proper role for this poll")
         else:
@@ -83,7 +93,9 @@ class PollPin(commands.Cog):
 
     @commands.admin()
     @managepoll.command(name="new")
-    async def managepoll_new(self, ctx: commands.Context, poll: str, role: discord.Role):
+    async def managepoll_new(
+        self, ctx: commands.Context, poll: str, role: discord.Role
+    ):
         """Make new poll"""
         if not await self._pollpin_exists(ctx.guild, poll):
             await self._pollpin_makepoll(ctx.guild, role, ctx.author, poll)
@@ -118,12 +130,16 @@ class PollPin(commands.Cog):
             data = await self.config.guild(ctx.guild).get_raw("polls", poll)
             role = discord.utils.get(ctx.guild.roles, id=data["role"])
             author = self.bot.get_user(data["owner"])
-            embed = self._pollpin_embed(description=f"Information on {poll} in {ctx.guild}")
+            embed = self._pollpin_embed(
+                description=f"Information on {poll} in {ctx.guild}"
+            )
             embed.add_field(name="Role", value=str(role), inline=True)
             embed.add_field(name="Owner", value=str(author), inline=True)
-            embed.add_field(name="Pins",
-                            value=f"Use {ctx.clean_prefix}managepoll pins [poll] to get pins",
-                            inline=False)
+            embed.add_field(
+                name="Pins",
+                value=f"Use {ctx.clean_prefix}managepoll pins [poll] to get pins",
+                inline=False,
+            )
             await ctx.send(embed=embed)
         else:
             await ctx.send(f"{poll} does not exist")
@@ -139,12 +155,16 @@ class PollPin(commands.Cog):
                     pinlist += f"{pin}\n"
                 if not pinlist:
                     pinlist = f"No pins in {poll} at {ctx.guild}"
-                embed = self._pollpin_embed(description=f"Pins in {poll} at {ctx.guild}")
+                embed = self._pollpin_embed(
+                    description=f"Pins in {poll} at {ctx.guild}"
+                )
                 embed.add_field(name="Pins", value=pinlist, inline=False)
                 await ctx.send(f"The PINs for {poll} have been sent via DM")
                 await ctx.author.send(embed=embed)
             else:
-                await ctx.send(f"You may not view the pins for {poll} as you are not the poll owner")
+                await ctx.send(
+                    f"You may not view the pins for {poll} as you are not the poll owner"
+                )
         else:
             await ctx.send(f"{poll} does not exist")
 
