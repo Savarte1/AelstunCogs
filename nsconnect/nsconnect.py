@@ -8,21 +8,9 @@ import hashlib
 import aiohttp
 import asyncio
 import aiofiles
+import aiosqlite
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from aiolimiter import AsyncLimiter
-
-
-class NoAgentException(Exception):
-    """Raised when no user agent is set"""
-
-    pass
-
-
-class NSConnectionError(Exception):
-    """Raised when there is an error connecting to NationStates"""
-
-    pass
 
 
 class NSConnect(commands.Cog):
@@ -34,12 +22,11 @@ class NSConnect(commands.Cog):
         self.config = Config.get_conf(
             self, identifier=9_121_137_209, force_registration=True
         )
-        self.nslimiter = AsyncLimiter(40, 30)  # Limit to 40 requests per 30 seconds
         self.nsagent: Optional[str] = None
         self.session = aiohttp.ClientSession()
         self.scheduler: Optional[AsyncIOScheduler] = None
         self.trigger: Optional[CronTrigger] = None
-        default_global = {"verify_key": None, "agent": None}
+        default_global = {"verify_key": None, "agent": None, "nations": {}}
         default_user = {"nations": []}
         default_guild = {
             "activate": False,
@@ -63,7 +50,7 @@ class NSConnect(commands.Cog):
         # Scheduler
         self.scheduler = AsyncIOScheduler(timezone=utc)
         self.trigger = CronTrigger(hour=7, second=30)
-        self.scheduler.add_job(self._nsupdate(), self.trigger)
+        self.scheduler.add_job(self._nsupdate, self.trigger)
         self.scheduler.start()
 
     def cog_unload(self):
@@ -82,45 +69,16 @@ class NSConnect(commands.Cog):
         else:
             return None
 
-    async def _nsrequest(self, uri: str, data=False):
-        if not self.nsagent:
-            raise NoAgentException
-        headers = {"User-Agent": f"{self.nsagent}"}
-        compiled_uri = f"https://www.nationstates.net/{uri}"
-        async with self.nslimiter:
-            async with self.session.get(compiled_uri, headers=headers) as response:
-                if response.status == 200:
-                    if data:
-                        return await response.read()
-                    else:
-                        return await response.text()
-                else:
-                    raise NSConnectionError
-
-    async def _nsdump(self):
-        if not self.nsagent:
-            raise NoAgentException
-        uri = "pages/nations.xml.gz"
-        data_directory = data_manager.cog_data_path(self)
-        path = data_directory / "nations.xml.gz"
-        try:
-            dump = await self._nsrequest(uri, data=True)
-        except NSConnectionError:
-            raise NSConnectionError
-        else:
-            async with aiofiles.open(path, mode="wb") as f:
-                await f.write(dump)
-
     # Updater
 
     async def _nsupdate(self):
         if not self.nsagent:
             return
 
-        try:
-            await self._nsdump()
-        except NSConnectionError:
-            return
+        # try:
+        #     await self._nsdump()
+        # except NSConnectionError:
+        #    return
 
     # Commands
 
@@ -158,30 +116,6 @@ class NSConnect(commands.Cog):
     @commands.group()
     async def nspanel(self, ctx: commands.Context):
         pass
-
-    @nspanel.command(name="test")
-    async def nspanel_test(self, ctx: commands.Context, uri):
-        """Test requests"""
-        try:
-            req = await self._nsrequest(uri)
-        except NoAgentException:
-            await ctx.send("User agent not set")
-        except NSConnectionError:
-            await ctx.send("Error connecting to NationStates")
-        else:
-            await ctx.send(chat_formatting.box(req, "xml"))
-
-    @nspanel.command(name="getdump")
-    async def nspanel_getdump(self, ctx: commands.Context):
-        """Download NS Nations dump"""
-        try:
-            await self._nsdump()
-        except NoAgentException:
-            await ctx.send("User agent not set")
-        except NSConnectionError:
-            await ctx.send("Error connecting to NationStates")
-        else:
-            await ctx.send("Downloaded NS nations dump")
 
     @nspanel.command(name="agent")
     async def nspanel_agent(self, ctx: commands.Context, agent: str = None):
