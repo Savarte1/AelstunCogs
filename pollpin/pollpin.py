@@ -1,9 +1,11 @@
-from redbot.core import commands, Config
+from redbot.core import commands, Config, data_manager
 from redbot.core.bot import Red
 import discord
-import databases
+from databases import Database
 import secrets
+from typing import Optional
 import asyncio
+from .queries import *
 
 
 class PollPin(commands.Cog):
@@ -15,12 +17,16 @@ class PollPin(commands.Cog):
         self.config = Config.get_conf(
             self, identifier=46_930_395_012, force_registration=True
         )
+        self.database: Optional[Database] = None
         asyncio.create_task(self.initialize())
     async def initialize(self):
-        pass
+        dbpath = data_manager.cog_data_path(self) / "pollpin.db"
+        self.database = Database(f"sqlite://{dbpath}")
+        await self.database.connect()
+        await self.database.execute(query=POLLPIN_DB_INIT)
 
     def cog_unload(self):
-        pass
+        asyncio.create_task(self.database.disconnect())
 
     @staticmethod
     def _pollpin_embed(**kwargs):
