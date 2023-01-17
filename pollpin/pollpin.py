@@ -2,6 +2,7 @@ from redbot.core import commands, Config
 from redbot.core.bot import Red
 import discord
 import secrets
+import asyncio
 
 
 class PollPin(commands.Cog):
@@ -13,8 +14,12 @@ class PollPin(commands.Cog):
         self.config = Config.get_conf(
             self, identifier=46_930_395_012, force_registration=True
         )
-        default_guild = {"polls": {}}
-        self.config.register_guild(**default_guild)
+        asyncio.create_task(self.initialize())
+    async def initialize(self):
+        pass
+
+    def cog_unload(self):
+        pass
 
     @staticmethod
     def _pollpin_embed(**kwargs):
