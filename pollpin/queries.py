@@ -1,4 +1,4 @@
-POLLPIN_DB_INIT = """
+POLLPIN_DB_INIT_1 = """
 CREATE TABLE IF NOT EXISTS "pollpin_pins" (
     "id"	INTEGER,
     "poll_id"	INTEGER,
@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS "pollpin_pins" (
     UNIQUE("poll_id","member"),
     UNIQUE("poll_id","pin")
 );
+"""
+POLLPIN_DB_INIT_2 = """
 CREATE TABLE IF NOT EXISTS "pollpin_polls" (
     "id"	INTEGER,
     "guild_id"	INTEGER,

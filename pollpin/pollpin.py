@@ -20,10 +20,10 @@ class PollPin(commands.Cog):
         self.database: Optional[Database] = None
         asyncio.create_task(self.initialize())
     async def initialize(self):
-        dbpath = data_manager.cog_data_path(self) / "pollpin.db"
-        self.database = Database(f"sqlite://{dbpath}")
+        self.database = Database(f"sqlite+aiosqlite:///{data_manager.cog_data_path(self)}/pollpin.db")
         await self.database.connect()
-        await self.database.execute(query=POLLPIN_DB_INIT)
+        await self.database.execute(query=POLLPIN_DB_INIT_1)
+        await self.database.execute(query=POLLPIN_DB_INIT_2)
 
     def cog_unload(self):
         asyncio.create_task(self.database.disconnect())
