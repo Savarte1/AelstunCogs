@@ -1,4 +1,4 @@
 from .pollpin import PollPin
 
-def setup(bot):
+async def setup(bot):
     bot.add_cog(PollPin(bot))
